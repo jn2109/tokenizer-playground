@@ -1,4 +1,5 @@
 
+import unicodedata
 import html
 import urllib.request
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 import sentencepiece as spm
 import streamlit as st
 from tokenizers import Tokenizer
+
 
 # --------------------------------------------------
 # Page configuration
@@ -23,6 +25,11 @@ st.markdown(
     "assign IDs, and reconstruct the original text."
 )
 
+
+# --------------------------------------------------
+# Model paths and download URLs
+# --------------------------------------------------
+
 BASE_DIR = Path(__file__).parent
 
 SP_MODEL_PATH = BASE_DIR / "tokenizer.model"
@@ -34,11 +41,11 @@ SP_MODEL_URL = (
 )
 
 BPE_MODEL_URL = (
-    "https://huggingface.co/gpt2/resolve/main/tokenizer.json"
+    "https://huggingface.co/gpt2/resolve/main/"
+    "tokenizer.json"
 )
 
 COLORS = [
-    "#DCEBFF",
     "#DDF5E5",
     "#FFE8CC",
     "#F2DEFF",
@@ -121,19 +128,31 @@ def show_token_details(tokens, ids):
     )
 
 
+# --------------------------------------------------
+# Display decoded text and compare Unicode safely
+# --------------------------------------------------
+
+
+
 def show_decoding_result(decoded, original):
     st.markdown("**Decoded text**")
     st.code(decoded if decoded else "(empty string)")
 
-    if decoded == original:
+    normalized_decoded = unicodedata.normalize("NFC", decoded)
+    normalized_original = unicodedata.normalize("NFC", original)
+
+    if normalized_decoded == normalized_original:
         st.success("Decoded text matches the original input exactly.")
+    elif normalized_decoded.rstrip("\n") == normalized_original.rstrip("\n"):
+        st.info(
+            "The decoded text matches, except for a trailing newline "
+            "that the tokenizer does not preserve."
+        )
     else:
         st.warning(
             "Decoded text differs from the original input. "
-            "This may result from tokenizer normalization or "
-            "how the tokenizer handles special tokens."
+            "Check whitespace, Unicode normalization, or tokenization behavior."
         )
-
 
 # --------------------------------------------------
 # Main application
@@ -171,11 +190,10 @@ try:
             bpe_tokens = bpe_encoding.tokens
             bpe_ids = bpe_encoding.ids
 
-            # Decode IDs using the tokenizer's byte-level decoder.
-            # Do not decode the visible token strings directly.
+            # Decode using the tokenizer's byte-level decoder.
             bpe_decoded = bpe.decode(bpe_ids)
 
-            # Summary
+            # Comparison overview
             st.subheader("📊 Comparison overview")
 
             col1, col2, col3 = st.columns(3)
